@@ -1,19 +1,18 @@
 BUILD_DIR=build/
 OUTPUT_DIR=output/
-SLD_DIR=sdl_src/
+SLD_DIR=sdl/
 
-.PHONY: build clean
+.PHONY: build run clean
 
-build: $(OUTPUT_DIR)/crosshair.exe
-
-$(OUTPUT_DIR)/crosshair.exe: $(BUILD_DIR)/crosshair.exe
-	cmake --install ${BUILD_DIR} --prefix ${OUTPUT_DIR}
-
-$(BUILD_DIR)/crosshair.exe: $(BUILD_DIR)/build.ninja
+build: $(BUILD_DIR)/build.ninja
 	cmake --build $(BUILD_DIR)
+	cmake --install ${BUILD_DIR} --prefix ${OUTPUT_DIR}
 
 $(BUILD_DIR)/build.ninja:
 	cmake -B $(BUILD_DIR) -G Ninja -DSDL_STATIC=ON
+
+run: build
+	output/crosshair.exe
 
 clean:
 	cmake --build $(BUILD_DIR) --target clean

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(crosshair)
+project(myguiapp)
 
 add_compile_options(-static -static-libstdc++ -static-libgcc)
 set(SDL_STATIC ON CACHE BOOL "SDL static linking")
@@ -20,9 +20,9 @@ target_sources(imgui PRIVATE
 target_link_libraries(imgui PRIVATE SDL3::SDL3-static)
 target_include_directories(imgui PUBLIC imgui imgui/backends)
 
-add_executable(crosshair src/main.cpp)
-target_link_libraries(crosshair PRIVATE SDL3::SDL3-static imgui)
+add_executable(myguiapp src/main.cpp)
+target_link_libraries(myguiapp PRIVATE SDL3::SDL3-static imgui)
 
-install(TARGETS crosshair
+install(TARGETS myguiapp
 	RUNTIME DESTINATION .
 )

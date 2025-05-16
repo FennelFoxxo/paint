@@ -9,10 +9,10 @@ build: $(BUILD_DIR)/build.ninja
 	cmake --install ${BUILD_DIR} --prefix ${OUTPUT_DIR}
 
 $(BUILD_DIR)/build.ninja:
-	cmake -B $(BUILD_DIR) -G Ninja -DSDL_STATIC=ON
+	cmake -B $(BUILD_DIR) -G Ninja
 
 run: build
-	output/crosshair.exe
+	cd $(OUTPUT_DIR) && ./myguiapp
 
 clean:
 	cmake --build $(BUILD_DIR) --target clean

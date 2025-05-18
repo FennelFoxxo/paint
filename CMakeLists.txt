@@ -10,7 +10,6 @@ add_subdirectory(sdl EXCLUDE_FROM_ALL)
 add_library(imgui STATIC)
 target_sources(imgui PRIVATE
 	imgui/imgui.cpp
-	imgui/imgui_demo.cpp
 	imgui/imgui_draw.cpp
 	imgui/imgui_tables.cpp
 	imgui/imgui_widgets.cpp
@@ -20,7 +19,12 @@ target_sources(imgui PRIVATE
 target_link_libraries(imgui PRIVATE SDL3::SDL3-static)
 target_include_directories(imgui PUBLIC imgui imgui/backends)
 
-add_executable(myguiapp src/main.cpp)
+add_executable(myguiapp
+	src/main.cpp
+	src/gui_resource.cpp
+	src/gui.cpp
+	src/backend.cpp
+)
 target_link_libraries(myguiapp PRIVATE SDL3::SDL3-static imgui)
 
 install(TARGETS myguiapp

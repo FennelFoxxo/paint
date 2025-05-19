@@ -3,8 +3,8 @@
 #include "state.hpp"
 #include "gui_resource.hpp"
 
-
-// Updates the state with meta information about the graphical state and window, such as window events and mouse position
-void guiUpdateStateMeta(State* state);
+// Draw the GUI to the screen
 void guiDraw(State* state);
+
+// Renders the GUI to the window
 void guiPresent(State* state);

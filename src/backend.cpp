@@ -1,50 +1,101 @@
 #include "backend.hpp"
+#include "texture.hpp"
+#include "utils.hpp"
 
 #include <string>
 #include <stdexcept>
+#include <cmath>
+#include <iostream>
 
-void editPixel(SDL_Texture* texture, int x, int y, unsigned char rgba[4]) {
-    unsigned char* texture_bytes;
-    int pitch;
-    SDL_LockTexture(texture, NULL, (void**)&texture_bytes, &pitch);
+void editPixel(State* state, SDL_Texture* texture, int x, int y, unsigned char rgba_src[4]) {
+    Texture temp(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 1, 1);
+    temp.fill(rgba_src[3], rgba_src[2], rgba_src[1]);
+    temp.renderTo(state->canvas, nullptr, &(const SDL_FRect&){(float)x, (float)y, 1, 1});
+}
 
-    unsigned char* pixel_dest = &texture_bytes[y * pitch + x * 4];
-    memcpy(pixel_dest, rgba, 4);
+void recreateCanvas(State* state, int width, int height) {
+    state->canvas = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, width, height);
+    state->canvas.fill(255, 255, 255);
+}
 
-    SDL_UnlockTexture(texture);
+void resizeCanvas(State* state, int new_width, int new_height) {
+    Texture new_canvas(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, new_width, new_height);
+    state->canvas.renderTo(new_canvas, nullptr, nullptr);
+    state->canvas = new_canvas;
 }
 
 void backendInit(State* state) {
     state->clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
     // Image
-    state->canvas = SDL_CreateTexture(state->gui_resource->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 256, 256);
-    if (state->canvas == nullptr)
-        throw std::runtime_error(std::string("Error: SDL_CreateTexture(): ") + SDL_GetError());
-    
-    unsigned char* texture_bytes;
-    int pitch;
-    SDL_LockTexture(state->canvas, NULL, (void**)&texture_bytes, &pitch);
-    unsigned char rgba[4] = {255, 0, 0, 0};
-    for (int y = 0; y < 256; y++) {
-        for (int x = 0; x < 256; x++) {
-            unsigned char* pixel_dest = &texture_bytes[y * pitch + x * sizeof(rgba)];
-            rgba[3] = x;
-            rgba[1] = y;
-            memcpy(pixel_dest, rgba, sizeof(rgba));
-        }
-    }
-    SDL_UnlockTexture(state->canvas);
+    recreateCanvas(state, 400, 400);
 }
 
+void handleDraw(State* state) {
+    if (!state->mouse_left_down) {
+        return;
+    }
+    if (!state->mouse_over_canvas) {
+        return;
+    }
+    
+    ImVec2 canvas_size{(float)state->canvas.width(), (float)state->canvas.height()};
+    ImVec2 canvas_pos = screenToCanvasPos(canvas_size, state->viewport, state->viewport_offset, state->scale, state->mouse_pos);
+    ImVec2 canvas_pos_old = screenToCanvasPos(canvas_size, state->viewport, state->viewport_offset, state->scale, state->mouse_pos_old);
+
+    SDL_SetRenderDrawColorFloat(state->gui_resource->renderer, state->draw_color.x, state->draw_color.y, state->draw_color.z, state->draw_color.w);
+    SDL_SetRenderTarget(state->gui_resource->renderer, state->canvas.get());
+    SDL_RenderLine(state->gui_resource->renderer, canvas_pos_old.x, canvas_pos_old.y, canvas_pos.x, canvas_pos.y);
+    SDL_SetRenderTarget(state->gui_resource->renderer, nullptr);
+}
+
+void handleNewFile(State* state) {
+    if (state->file_action_info.status == FileActionInfo::DoNew) {
+        int new_width = state->file_action_info.new_info.width;
+        int new_height = state->file_action_info.new_info.height;
+        recreateCanvas(state, new_width, new_height);
+        state->file_action_info.status = FileActionInfo::None;
+    }
+}
+
+void handleImageResize(State* state) {
+    if (state->image_action_info.status == ImageActionInfo::DoResize) {
+        int width = state->image_action_info.resize_info.width;
+        int height = state->image_action_info.resize_info.height;
+        resizeCanvas(state, width, height);
+        state->image_action_info.status = ImageActionInfo::None;
+    }
+}
+
+void handleScroll(State* state) {
+    state->scale *= pow(1.1, state->scroll);
+    if (state->scale < 0.1) state->scale = 0.1;
+    if (state->scale > 10) state->scale = 10;
+    
+}
+
+void handleRightDrag(State* state) {
+    if (state->mouse_right_dragging) {
+        if (state->canvas_dragging_state == CanvasDraggingState::not_dragging) {
+            state->canvas_dragging_state = state->mouse_over_canvas ? CanvasDraggingState::dragging_canvas : CanvasDraggingState::dragging_off_canvas;
+        }
+    } else {
+        state->canvas_dragging_state = CanvasDraggingState::not_dragging;
+    }
+    
+    if (state->canvas_dragging_state == CanvasDraggingState::dragging_canvas) {
+        state->viewport_offset.x -= (state->drag_delta.x - state->drag_delta_old.x) / state->scale;
+        state->viewport_offset.y -= (state->drag_delta.y - state->drag_delta_old.y) / state->scale;
+    }
+    
+    state->drag_delta_old = state->drag_delta;
+}
 
 void backendProcess(State* state) {
-    if (state->mouse_down) {
-            if (state->mouse_x >= 0 && state->mouse_x < 256) {
-                if (state->mouse_y >= 0 && state->mouse_y < 256) {
-                    unsigned char rgba[4] = {255, 255, 255, 255};
-                    editPixel(state->canvas, state->mouse_x, state->mouse_y, rgba);
-                }
-            }
-        }
+    handleDraw(state);
+    handleNewFile(state);
+    handleImageResize(state);
+    handleRightDrag(state);
+    handleScroll(state);
+    state->mouse_pos_old = state->mouse_pos;
 }

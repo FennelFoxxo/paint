@@ -8,34 +8,39 @@
 #include <SDL3/SDL.h>
 
 GuiResource::GuiResource(std::string window_name, int window_width, int window_height) {
-    // Setup SDL
+    // Initialize SDL
     if (!SDL_Init(SDL_INIT_VIDEO))
+        // Throw error if initialization failed
         throw std::runtime_error(std::string("Error: SDL_Init(): ") + SDL_GetError());
 
-    // Create window with SDL_Renderer graphics context
-    window = SDL_CreateWindow(  window_name.c_str(), window_width, window_height,
-                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
+    // Create window that is resizable
+    window = SDL_CreateWindow(  window_name.c_str(), window_width, window_height, SDL_WINDOW_RESIZABLE);
     if (window == nullptr)
+        // Throw error if window creation failed
         throw std::runtime_error(std::string("Error: SDL_CreateWindow(): ") + SDL_GetError());
 
+    // Create renderer used to draw objects to the window
     renderer = SDL_CreateRenderer(window, nullptr);
-    SDL_SetRenderVSync(renderer, 1);
     if (renderer == nullptr)
+        // Throw error if renderer creation failed
         throw std::runtime_error(std::string("Error: SDL_CreateRenderer(): ") + SDL_GetError());
+    
+    // Set vsync to match monitor refresh rate
+    SDL_SetRenderVSync(renderer, 1);
 
-    //SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    SDL_ShowWindow(window);
-
-    // Setup Dear ImGui context
+    // Make sure our ImGui header matches with the compiled ImGui library
     IMGUI_CHECKVERSION();
+    
+    // Create ImGui context, holds internal ImGui state
     ImGui::CreateContext();
+    
+    // Get IO object, holds a struct of input/output object that changes every frame (e.g. mouse, keyboard, fps info)
     io = &ImGui::GetIO();
-    io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
-    // Setup Dear ImGui style
+    // Setup ImGui style to use dark mode
     ImGui::StyleColorsDark();
 
-    // Setup Platform/Renderer backends
+    // Setup SDL backend for ImGui
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
 }

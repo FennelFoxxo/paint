@@ -24,6 +24,7 @@ add_executable(myguiapp
 	src/gui_resource.cpp
 	src/gui.cpp
 	src/backend.cpp
+	src/texture.cpp
 )
 target_link_libraries(myguiapp PRIVATE SDL3::SDL3-static imgui)
 

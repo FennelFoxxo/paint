@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(myguiapp)
 
-add_compile_options(-static -static-libstdc++ -static-libgcc)
+add_link_options(-static-libstdc++ -static-libgcc)
 set(SDL_STATIC ON CACHE BOOL "SDL static linking")
 
 add_subdirectory(sdl EXCLUDE_FROM_ALL)

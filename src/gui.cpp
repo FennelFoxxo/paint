@@ -334,10 +334,14 @@ void guiPresent(State* state) {
         // Set draw color
         SDL_SetRenderDrawColorFloat(renderer, state->draw_color.x, state->draw_color.y, state->draw_color.z, state->draw_color.w);
 
-        // Draw line
-        ImVec2 start = state->draw_line_start.screen;
+        // Start screen position might have changed if user scrolled canvas while drawing line
+        // Get original canvas position of start pos and then map that back into screen space
+        ImVec2 start_canvas = state->draw_line_start.canvas;
+        ImVec2 start_screen = canvasToScreenPos(state->canvas.size(), state->viewport, state->viewport_offset, state->scale, start_canvas);
+        
+        
         ImVec2 end = state->draw_line_end.screen;
-        SDL_RenderLine(renderer, start.x, start.y, end.x, end.y);
+        SDL_RenderLine(renderer, start_screen.x, start_screen.y, end.x, end.y);
     }
     
     // Render the GUI on top of the canvas

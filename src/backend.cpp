@@ -50,14 +50,16 @@ void recreateBrushTexture(State* state, int radius, ImVec4 color) {
 }
 
 void backendInit(State* state) {
-    state->icons.brush = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 48, 48);
-    state->icons.brush.fill({1.0f, 1.0f, 0.0f, 0.5f});
+    SDL_Surface* temp_surface;
+
+    temp_surface = openImage("icons/brush.png");
+    state->icons.brush = Texture(state->gui_resource->renderer, temp_surface);
     
-    state->icons.line = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 48, 48);
-    state->icons.line.fill({1.0f, 1.0f, 0.0f, 0.5f});
+    temp_surface = openImage("icons/line.png");
+    state->icons.line = Texture(state->gui_resource->renderer, temp_surface);
     
-    state->icons.fill = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 48, 48);
-    state->icons.fill.fill({1.0f, 1.0f, 0.0f, 0.5f});
+    temp_surface = openImage("icons/bucket.png");
+    state->icons.fill = Texture(state->gui_resource->renderer, temp_surface);
     
     recreateBrushTexture(state, state->brush_size / 2, state->draw_color);
     recreateCanvas(state, state->initial_canvas_size);
@@ -127,6 +129,9 @@ void handleDrawFill(State* state) {
     
     // Copy the data of the filled canvas to the newly created canvas
     filled_canvas.renderTo(state->canvas, NULL, NULL);
+    
+    // Clean up surface
+    SDL_DestroySurface(canvas_surface);
 }
 
 // Process drawing on canvas
@@ -145,17 +150,79 @@ void handleDraw(State* state) {
 }
 
 void handleNewFile(State* state) {
-    if (state->file_action_info.status == FileActionInfo::DoNew) {
-        recreateCanvas(state, state->file_action_info.new_info.size);
-        state->file_action_info.status = FileActionInfo::None;
-    }
+    recreateCanvas(state, state->file_action_info.new_info.size);
 }
 
+void handleOpenFile(State* state) {
+    // Open file dialog asking user where to save file
+    std::string path = requestFileDialog({ { "PNG", "png" }, { "JPG", "jpg" } }, false);
+    
+    // Return if path is empty (user cancelled)
+    if (path.empty()) return;
+    
+    // Read image file from path
+    SDL_Surface* image_surface = openImage(path);
+    
+    // Create texture from surface of image
+    Texture image_texture = Texture(state->gui_resource->renderer, image_surface);
+    
+    // Create new blank canvas with same size as the opened image
+    recreateCanvas(state, image_texture.size());
+    
+    // Copy the data of the image to the newly created canvas
+    image_texture.renderTo(state->canvas, NULL, NULL);
+    
+    // Clean up surface
+    SDL_DestroySurface(image_surface);
+}
+
+void handleSaveAsFile(State* state) {
+    // Open file dialog asking user where to save file
+    std::string path = requestFileDialog({ { "PNG", "png" }, { "JPG", "jpg" } }, true);
+    
+    // Return if path is empty (user cancelled)
+    if (path.empty()) return;
+    
+    // Create a surface from the canvas texture so we can read its pixels directly
+    state->canvas.setRenderTarget();
+    SDL_Surface* canvas_surface = SDL_RenderReadPixels(state->gui_resource->renderer, NULL);
+    
+    // Write image file to path
+    saveImage(path, canvas_surface);
+    
+    // Clean up surface
+    SDL_DestroySurface(canvas_surface);
+}
+
+
 void handleImageResize(State* state) {
-    if (state->image_action_info.status == ImageActionInfo::DoResize) {
-        resizeCanvas(state, state->image_action_info.resize_info.size);
-        state->image_action_info.status = ImageActionInfo::None;
+    resizeCanvas(state, state->image_action_info.resize_info.size);
+}
+
+void handleMenuBarAction(State* state) {
+    switch (state->file_action_info.status) {
+        case FileActionInfo::DoNew:
+            handleNewFile(state);
+            break;
+        case FileActionInfo::DoOpen:
+            handleOpenFile(state);
+            break;
+        case FileActionInfo::DoSaveAs:
+            handleSaveAsFile(state);
+            break;
+        default:
+            break;
     }
+    state->file_action_info.status = FileActionInfo::None;
+    
+    switch (state->image_action_info.status) {
+        case ImageActionInfo::DoResize:
+            handleImageResize(state);
+            break;
+        default:
+            break;
+    }
+    state->image_action_info.status = ImageActionInfo::None;
 }
 
 void handleScroll(State* state) {
@@ -196,8 +263,7 @@ void updateOldVars(State* state) {
 // Process events that happened e.g. if user dragged mouse to draw
 void backendProcess(State* state) {
     handleDraw(state);
-    handleNewFile(state);
-    handleImageResize(state);
+    handleMenuBarAction(state);
     handleCanvasDrag(state);
     handleScroll(state);
     handleBrushDetailsChange(state);

@@ -61,12 +61,12 @@ void drawMainMenuBar(State* state) {
             
             // "Open" button
             if (ImGui::MenuItem("Open")) {
-                //state->file_action_info.status = FileActionInfo::Open;
+                state->file_action_info.status = FileActionInfo::DoOpen;
             }
             
             // "Save As" button
             if (ImGui::MenuItem("Save As")) {
-                //state->file_action_info.status = FileActionInfo::SaveAs;
+                state->file_action_info.status = FileActionInfo::DoSaveAs;
             }
             
             // "Exit" button

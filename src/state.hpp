@@ -27,13 +27,6 @@ struct FileActionInfo {
         // Size of new canvas to be created
         ImVec2 size;
     } new_info;
-    
-    struct OpenInfo {
-        std::string fname;
-    } open_info;
-    
-    struct SaveAsInfo {
-    } save_as_info;
 };
 
 // Actions performed by the "Image" menu in the top menu bar
@@ -140,10 +133,10 @@ struct State {
     Texture canvas;
     
     // Background color of icon texture when it is selected
-    ImVec4 selected_icon_color{0.5, 0.5, 0, 1};
+    ImVec4 selected_icon_color{1, 1, 1, 1};
     
     // Background color of icon texture when it is not selected
-    ImVec4 unselected_icon_color{0, 0, 0, 1};
+    ImVec4 unselected_icon_color{0.3, 0.3, 0.3, 1};
     struct {
         Texture brush;
         Texture line;

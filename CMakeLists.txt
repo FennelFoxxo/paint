@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
-project(myguiapp)
+project(paint)
 
 add_link_options(-static-libstdc++ -static-libgcc)
 set(SDL_STATIC ON CACHE BOOL "SDL static linking")
 
 add_subdirectory(sdl EXCLUDE_FROM_ALL)
-
 
 add_library(imgui STATIC)
 target_sources(imgui PRIVATE
@@ -19,15 +18,19 @@ target_sources(imgui PRIVATE
 target_link_libraries(imgui PRIVATE SDL3::SDL3-static)
 target_include_directories(imgui PUBLIC imgui imgui/backends)
 
-add_executable(myguiapp
+add_subdirectory(nativefiledialog-extended EXCLUDE_FROM_ALL)
+
+add_executable(paint
 	src/main.cpp
 	src/gui_resource.cpp
 	src/gui.cpp
 	src/backend.cpp
 	src/texture.cpp
+	src/utils.cpp
 )
-target_link_libraries(myguiapp PRIVATE SDL3::SDL3-static imgui)
+target_link_libraries(paint PRIVATE SDL3::SDL3-static imgui nfd)
+target_include_directories(paint PRIVATE stb)
 
-install(TARGETS myguiapp
+install(TARGETS paint
 	RUNTIME DESTINATION .
 )

@@ -2,14 +2,8 @@
 #include "gui.hpp"
 #include "backend.hpp"
 #include "texture.hpp"
+#include <iostream>
 
-void myfunc() {}
-
-void dothing() {
-    for (int i = 0; i != 8; i++) {
-        myfunc();
-    }
-}
 
 int main(int, char**)
 {
@@ -23,7 +17,7 @@ int main(int, char**)
 
     // Initializes the state and creates some required objects e.g. canvas and icon textures
     backendInit(&state);
-
+    
     // Main loop
     while (!state.should_quit) {
         // Draw the GUI to the screen

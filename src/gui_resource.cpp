@@ -6,6 +6,7 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
+#include <nfd.h>
 
 GuiResource::GuiResource(std::string window_name, int window_width, int window_height) {
     // Initialize SDL
@@ -46,10 +47,15 @@ GuiResource::GuiResource(std::string window_name, int window_width, int window_h
     // Setup SDL backend for ImGui
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
+    
+    // Initialize native file dialog
+    NFD_Init();
 }
 
 GuiResource::~GuiResource() {
     // Cleanup
+    NFD_Quit();
+    
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();

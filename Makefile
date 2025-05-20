@@ -1,5 +1,5 @@
 BUILD_DIR=build/
-OUTPUT_DIR=output/
+OUTPUT_DIR=./
 SLD_DIR=sdl/
 
 .PHONY: build run clean
@@ -12,7 +12,7 @@ $(BUILD_DIR)/build.ninja:
 	cmake -B $(BUILD_DIR) -G Ninja
 
 run: build
-	cd $(OUTPUT_DIR) && ./myguiapp
+	cd $(OUTPUT_DIR) && ./paint
 
 clean:
 	cmake --build $(BUILD_DIR) --target clean

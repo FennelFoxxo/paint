@@ -3,6 +3,14 @@
 #include "backend.hpp"
 #include "texture.hpp"
 
+void myfunc() {}
+
+void dothing() {
+    for (int i = 0; i != 8; i++) {
+        myfunc();
+    }
+}
+
 int main(int, char**)
 {
     // Create object which represents lifetime of GUI libraries.

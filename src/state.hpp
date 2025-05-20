@@ -2,10 +2,14 @@
 
 #include "gui_resource.hpp"
 #include "texture.hpp"
+#include "utils.hpp"
 
 #include <imgui.h>
 
 #include <SDL3/SDL.h>
+
+// Forward declaration
+struct State;
 
 // Some structs to facilitate communication between the GUI and backend
 
@@ -20,9 +24,8 @@ struct FileActionInfo {
     Status status = None;
     
     struct NewInfo {
-        // Width and height of new canvas to be created
-        int width;
-        int height;
+        // Size of new canvas to be created
+        ImVec2 size;
     } new_info;
     
     struct OpenInfo {
@@ -42,37 +45,74 @@ struct ImageActionInfo {
     Status status = None;
     
     struct ResizeInfo {
-        // Width and height that the canvas should be resized to
-        int width;
-        int height;
+        // Size that the canvas should be resized to
+        ImVec2 size;
     } resize_info;
 };
 
-// Keeps track of information about dragging with the right mouse button
-enum class CanvasDraggingState {
-    not_dragging,           // Not dragging, or the right mouse button is not being clicked
-    dragging_canvas,        // The user started holding the right mouse button while over the canvas and the canvas should be dragged
-    dragging_off_canvas,    // The user started holding the right mouse button while not over the canvas (e.g. some GUI element) and should be ignored
+struct MousePos {
+    ImVec2 screen; // XY position of mouse on the screen
+    ImVec2 canvas; // XY position of mouse on the canvas
+    
+    void updateCanvasPos(State* state);
+};
+
+// Keeps track of information about mouse dragging
+struct MouseButtonInfo {
+    // Is mouse button down?
+    bool down = false;
+
+    // Position of mouse when button started being held
+    MousePos drag_start;
+};
+
+// Keep track of which tool the user has selected for drawing
+enum class DrawingTool {
+    Brush,
+    Line,
+    Fill
 };
 
 // Faciliate communication between GUI and backend
 struct State {
+    // CONSTANTS
+    
+    // Color used to fill in background where no elements are drawn
+    const ImVec4 clear_color{0.45f, 0.55f, 0.60f, 1.00f};
+    
+    const ImVec2 initial_canvas_size{500.0f, 500.0f};
+    
+    
+    // END CONSTANTS
+    
+    
     // Pass around GUI resources - the SDL renderer is stored in here and is needed for many texture-modifying functions
     GuiResource* gui_resource;
     
     bool should_quit = false;           // Set to true if the program should terminate
     int window_width, window_height;    // Size of the main window on the screen
-    bool mouse_left_down;               // True if left mouse button is being held down
     float scroll;                       // Positive of mouse wheel is being scrolled up, negative if down
-    ImVec2 mouse_pos;                   // XY position of mouse on the screen
-    ImVec2 mouse_pos_old;               // This is just mouse_pos from the previous frame
-    bool mouse_over_canvas;             // Is the mouse hovering over the canvas and not any GUI elements?
+    bool gui_wants_mouse;               // Is the mouse hovering or dragging over any GUI elements?
     
-    // Information about whether the canvas is being dragged around or not
-    bool mouse_right_dragging; // Raw mouse dragging info returned by ImGui - true if RMB is held and mouse is moving
-    CanvasDraggingState canvas_dragging_state = CanvasDraggingState::not_dragging;
-    ImVec2 drag_delta{0, 0}; // Amount mouse has dragged since RMB started being held
-    ImVec2 drag_delta_old{0, 0}; // This is just drag_delta from previous frame, compared with drag_delta to see how much mouse moved
+    MousePos mouse_pos;     // Position of the mouse    
+    MousePos mouse_pos_old; // Position of the mouse from the previous frame
+    
+    MouseButtonInfo lmb_info;
+    MouseButtonInfo lmb_info_old;
+    MouseButtonInfo rmb_info;
+    MouseButtonInfo rmb_info_old;
+    
+    // Start position of the line when in line mode
+    MousePos draw_line_start;
+    MousePos draw_line_end;
+    bool drawing_line = false;
+    
+    // Brush settings
+    int brush_size = 15; // Brush radius in pixels
+    bool brush_details_changed = false; // Has the user tweaked the brush size or color since the last frame?
+    Texture brush_texture_preview; // Preview of brush size, circular border with no fill
+    Texture brush_texture; // Brush texture, circle with fill
+    DrawingTool drawing_tool = DrawingTool::Brush; // Which tool has the user selected for drawing?
     
     float framerate; // FPS of window
     
@@ -85,10 +125,8 @@ struct State {
     // Size of the menu on the right that holds drawing tools
     int right_menu_width = 200;
     
-    ImVec4 clear_color;
-    
     // Selected paint color - values are floats between 0 and 1
-    ImVec4 draw_color = {1, 0, 0, 1};
+    ImVec4 draw_color{1, 0, 0, 1};
     
     // GUI window visibility flags
     bool show_resize_window = false;
@@ -100,4 +138,22 @@ struct State {
     
     // Texture object of the area that can be drawn to
     Texture canvas;
+    
+    // Background color of icon texture when it is selected
+    ImVec4 selected_icon_color{0.5, 0.5, 0, 1};
+    
+    // Background color of icon texture when it is not selected
+    ImVec4 unselected_icon_color{0, 0, 0, 1};
+    struct {
+        Texture brush;
+        Texture line;
+        Texture fill;
+    } icons;
 };
+
+// Synchronize canvas position from screen position
+// It's such a short function that there's no point putting it in its own source file,
+// so making it inline prevents multiple definition linker errors
+inline void MousePos::updateCanvasPos(State* state) {
+    canvas = screenToCanvasPos(state->canvas.size(), state->viewport, state->viewport_offset, state->scale, screen);
+}

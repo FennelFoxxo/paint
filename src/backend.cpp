@@ -7,62 +7,153 @@
 #include <cmath>
 #include <iostream>
 
-void editPixel(State* state, SDL_Texture* texture, int x, int y, unsigned char rgba_src[4]) {
-    Texture temp(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 1, 1);
-    temp.fill(rgba_src[3], rgba_src[2], rgba_src[1]);
-    temp.renderTo(state->canvas, nullptr, &(const SDL_FRect&){(float)x, (float)y, 1, 1});
+// When the canvas is created, resized, or loaded from an image, we should update the default
+// "File->New" and "Image->Resize" options to the new canvas size just for QOL so the new resolution
+// doesn't need to be retyped every time
+void updateCanvasOptionValues(State* state) {
+    state->file_action_info.new_info.size = state->canvas.size();
+    state->image_action_info.resize_info.size = state->canvas.size();
 }
 
-void recreateCanvas(State* state, int width, int height) {
-    state->canvas = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, width, height);
-    state->canvas.fill(255, 255, 255);
+
+void recreateCanvas(State* state, ImVec2 size) {
+    state->canvas = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, size.x, size.y);
+    SDL_SetTextureScaleMode(state->canvas.get(), SDL_SCALEMODE_NEAREST);
+    
+    state->canvas.fill({1.0f, 1.0f, 1.0f, 1.0f});
+    updateCanvasOptionValues(state);
 }
 
-void resizeCanvas(State* state, int new_width, int new_height) {
-    Texture new_canvas(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, new_width, new_height);
+void resizeCanvas(State* state, ImVec2 size) {
+    Texture new_canvas(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, size.x, size.y);
+    SDL_SetTextureScaleMode(new_canvas.get(), SDL_SCALEMODE_NEAREST);
+    
     state->canvas.renderTo(new_canvas, nullptr, nullptr);
     state->canvas = new_canvas;
+    updateCanvasOptionValues(state);
+}
+
+void recreateBrushTexture(State* state, int radius, ImVec4 color) {
+    // Make sure radius is at least 1
+    radius = (radius == 0 ? 1 : radius);
+    
+    SDL_Surface* surface = SDL_CreateSurface(radius*2, radius*2, SDL_PIXELFORMAT_RGBA8888);
+    drawCircle(surface, radius, color);
+    
+    state->brush_texture_preview = Texture(state->gui_resource->renderer, surface);
+    SDL_SetTextureScaleMode(state->brush_texture_preview.get(), SDL_SCALEMODE_NEAREST);
+    
+    floodFill(surface, {surface->w/2.0f, surface->h/2.0f}, state->draw_color);
+    state->brush_texture = Texture(state->gui_resource->renderer, surface);
+    
+    SDL_DestroySurface(surface);
 }
 
 void backendInit(State* state) {
-    state->clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    state->icons.brush = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 48, 48);
+    state->icons.brush.fill({1.0f, 1.0f, 0.0f, 0.5f});
     
-    // Image
-    recreateCanvas(state, 400, 400);
+    state->icons.line = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 48, 48);
+    state->icons.line.fill({1.0f, 1.0f, 0.0f, 0.5f});
+    
+    state->icons.fill = Texture(state->gui_resource->renderer, SDL_TEXTUREACCESS_TARGET, 48, 48);
+    state->icons.fill.fill({1.0f, 1.0f, 0.0f, 0.5f});
+    
+    recreateBrushTexture(state, state->brush_size / 2, state->draw_color);
+    recreateCanvas(state, state->initial_canvas_size);
 }
 
-void handleDraw(State* state) {
-    if (!state->mouse_left_down) {
-        return;
-    }
-    if (!state->mouse_over_canvas) {
-        return;
+// Process drawing with the brush tool
+void handleDrawBrush(State* state) {
+    // Return early if mouse is not held down
+    if (!state->lmb_info.down) return;
+    
+    // Return early if the mouse is not over the canvas
+    if (state->gui_wants_mouse) return;
+
+    // Draw line
+    state->canvas.stampTextureAlongLine(state->brush_texture, state->mouse_pos_old.canvas, state->mouse_pos.canvas);
+}
+
+// Process drawing with the line tool
+void handleDrawLine(State* state){
+    // Return early if the mouse is not over the canvas
+    if (state->gui_wants_mouse) return;
+    
+    // If the user just started dragging the mouse
+    if (state->lmb_info.down && !state->lmb_info_old.down) {
+        state->draw_line_start = state->mouse_pos;
+        state->drawing_line = true;
     }
     
-    ImVec2 canvas_size{(float)state->canvas.width(), (float)state->canvas.height()};
-    ImVec2 canvas_pos = screenToCanvasPos(canvas_size, state->viewport, state->viewport_offset, state->scale, state->mouse_pos);
-    ImVec2 canvas_pos_old = screenToCanvasPos(canvas_size, state->viewport, state->viewport_offset, state->scale, state->mouse_pos_old);
+    // If the user is currently dragging the mouse, continually update the end position so the line preview can be displayed
+    if (state->lmb_info.down) {
+        state->draw_line_end = state->mouse_pos;
+    }
+    
+    // If the user just let go of the mouse
+    if (!state->lmb_info.down && state->lmb_info_old.down && state->drawing_line) {
+        state->canvas.stampTextureAlongLine(state->brush_texture, state->draw_line_start.canvas, state->draw_line_end.canvas);
+        state->drawing_line = false;
+    }
+}
 
-    SDL_SetRenderDrawColorFloat(state->gui_resource->renderer, state->draw_color.x, state->draw_color.y, state->draw_color.z, state->draw_color.w);
-    SDL_SetRenderTarget(state->gui_resource->renderer, state->canvas.get());
-    SDL_RenderLine(state->gui_resource->renderer, canvas_pos_old.x, canvas_pos_old.y, canvas_pos.x, canvas_pos.y);
-    SDL_SetRenderTarget(state->gui_resource->renderer, nullptr);
+// Process drawing with the fill tool
+void handleDrawFill(State* state) {
+    // Return early if the mouse is over GUI elements
+    if (state->gui_wants_mouse) return;
+    
+    // Only need to fill if user just clicked the mouse
+    if (!state->lmb_info.down || state->lmb_info_old.down) return;
+    
+    // Make sure mouse cursor is over the canvas
+    if (state->mouse_pos.canvas.x < 0 || state->mouse_pos.canvas.x > state->canvas.width() ||
+        state->mouse_pos.canvas.y < 0 || state->mouse_pos.canvas.y > state->canvas.height()) return;
+
+    // Create a surface from the canvas texture so we can modify its pixels directly
+    state->canvas.setRenderTarget();
+    SDL_Surface* canvas_surface = SDL_RenderReadPixels(state->gui_resource->renderer, NULL);
+
+    // Fill the surface with the draw color at the mouse position
+    floodFill(canvas_surface, state->mouse_pos.canvas, state->draw_color);
+    
+    // Create a new texture from the result of the filled surface
+    // We can't directly copy this to the canvas, because the canvas needs to have target access mode for rendering to it,
+    // but creating a texture from a surface forces it to have streaming access mode
+    Texture filled_canvas = Texture(state->gui_resource->renderer, canvas_surface);
+    
+    // Create new blank canvas with same size as current canvas
+    recreateCanvas(state, state->canvas.size());
+    
+    // Copy the data of the filled canvas to the newly created canvas
+    filled_canvas.renderTo(state->canvas, NULL, NULL);
+}
+
+// Process drawing on canvas
+void handleDraw(State* state) {
+    switch(state->drawing_tool) {
+        case DrawingTool::Brush:
+            handleDrawBrush(state);
+            break;
+        case DrawingTool::Line:
+            handleDrawLine(state);
+            break;
+        case DrawingTool::Fill:
+            handleDrawFill(state);
+            break;
+    }
 }
 
 void handleNewFile(State* state) {
     if (state->file_action_info.status == FileActionInfo::DoNew) {
-        int new_width = state->file_action_info.new_info.width;
-        int new_height = state->file_action_info.new_info.height;
-        recreateCanvas(state, new_width, new_height);
+        recreateCanvas(state, state->file_action_info.new_info.size);
         state->file_action_info.status = FileActionInfo::None;
     }
 }
 
 void handleImageResize(State* state) {
     if (state->image_action_info.status == ImageActionInfo::DoResize) {
-        int width = state->image_action_info.resize_info.width;
-        int height = state->image_action_info.resize_info.height;
-        resizeCanvas(state, width, height);
+        resizeCanvas(state, state->image_action_info.resize_info.size);
         state->image_action_info.status = ImageActionInfo::None;
     }
 }
@@ -74,28 +165,42 @@ void handleScroll(State* state) {
     
 }
 
-void handleRightDrag(State* state) {
-    if (state->mouse_right_dragging) {
-        if (state->canvas_dragging_state == CanvasDraggingState::not_dragging) {
-            state->canvas_dragging_state = state->mouse_over_canvas ? CanvasDraggingState::dragging_canvas : CanvasDraggingState::dragging_off_canvas;
-        }
-    } else {
-        state->canvas_dragging_state = CanvasDraggingState::not_dragging;
-    }
+void handleCanvasDrag(State* state) {
+    // Alias
+    ImVec2 mouse = state->mouse_pos.screen;
+    ImVec2 mouse_old = state->mouse_pos_old.screen;
     
-    if (state->canvas_dragging_state == CanvasDraggingState::dragging_canvas) {
-        state->viewport_offset.x -= (state->drag_delta.x - state->drag_delta_old.x) / state->scale;
-        state->viewport_offset.y -= (state->drag_delta.y - state->drag_delta_old.y) / state->scale;
+    // Is the RMB being used to drag the mouse and is the mouse on the canvas?
+    if (state->rmb_info.down && !state->gui_wants_mouse) {
+        state->viewport_offset.x -= (mouse.x - mouse_old.x) / state->scale;
+        state->viewport_offset.y -= (mouse.y - mouse_old.y) / state->scale;
     }
-    
-    state->drag_delta_old = state->drag_delta;
 }
 
+void handleBrushDetailsChange(State* state) {
+    if (state->brush_details_changed) {
+        state->brush_details_changed = false;
+        recreateBrushTexture(state, state->brush_size / 2, state->draw_color);
+    }
+}
+
+// Update any _old variables so the values of variables can be compared between two frames
+// Should be called at the end of backend processing
+void updateOldVars(State* state) {
+    state->lmb_info_old = state->lmb_info;
+    state->rmb_info_old = state->rmb_info;
+    
+    state->mouse_pos_old = state->mouse_pos;
+}
+
+// Process events that happened e.g. if user dragged mouse to draw
 void backendProcess(State* state) {
     handleDraw(state);
     handleNewFile(state);
     handleImageResize(state);
-    handleRightDrag(state);
+    handleCanvasDrag(state);
     handleScroll(state);
-    state->mouse_pos_old = state->mouse_pos;
+    handleBrushDetailsChange(state);
+    
+    updateOldVars(state);
 }

@@ -36,6 +36,9 @@ GuiResource::GuiResource(std::string window_name, int window_width, int window_h
     
     // Get IO object, holds a struct of input/output object that changes every frame (e.g. mouse, keyboard, fps info)
     io = &ImGui::GetIO();
+    
+    // Disable automatic creation of .ini file (keeps track of window positions)
+    io->IniFilename = NULL;
 
     // Setup ImGui style to use dark mode
     ImGui::StyleColorsDark();

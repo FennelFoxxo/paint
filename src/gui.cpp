@@ -204,7 +204,7 @@ void drawRightMenu(State* state) {
     ImGui::SetNextWindowPos(ImVec2(state->window_width, state->viewport.y), 0, ImVec2(1, 0));
     
     // Force width to be preset amount and height to be full height of window
-    ImGui::SetNextWindowSize(ImVec2(state->right_menu_width, state->window_height));
+    ImGui::SetNextWindowSize(ImVec2(state->right_menu_width, state->window_height - state->viewport.y));
     
     // Create a window called "Hello, world!" and append into it.
     ImGui::Begin("Hello, world!", nullptr,
@@ -254,13 +254,16 @@ void drawRightMenu(State* state) {
     }
 
     // Edit 3 floats representing a color
+    ImGui::Text("Brush color");
     if (ImGui::ColorPicker3("Draw color", (float*)&state->draw_color, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoLabel)) {
         state->brush_details_changed = true;
     }
-
-    ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / state->framerate, state->framerate);
-    ImGui::Text("Size: %f", ImGui::GetWindowWidth());
     
+    // Skip to the bottom of the window
+    // GetFrameHeightWithSpacing() is the height of one element
+    ImGui::SetCursorPosY(state->window_height - state->viewport.y - ImGui::GetFrameHeightWithSpacing());
+    ImGui::Text("%.1f FPS", state->framerate);
+
     state->viewport.z = ImGui::GetWindowPos().x;
     
     ImGui::End();

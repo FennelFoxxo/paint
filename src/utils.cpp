@@ -178,7 +178,8 @@ std::string requestFileDialog(std::vector<nfdu8filteritem_t> filters, bool save)
         args.filterList = filters.data();
         args.filterCount = filters.size();
         
-        args.defaultPath = cwd.c_str();
+        // Convert path to utf-8 string and then to raw char* pointer
+        args.defaultPath = cwd.string().c_str();
         
         // Open dialog and block until dialog closed
         ret = NFD_SaveDialogU8_With(&out_path_raw, &args);
@@ -190,14 +191,12 @@ std::string requestFileDialog(std::vector<nfdu8filteritem_t> filters, bool save)
         args.filterList = filters.data();
         args.filterCount = filters.size();
         
-        args.defaultPath = cwd.c_str();
+        // Convert path to utf-8 string and then to raw char* pointer
+        args.defaultPath = cwd.string().c_str();
         
         // Open dialog and block until dialog closed
         ret = NFD_OpenDialogU8_With(&out_path_raw, &args);
     }
-    
-    
-    
     
     if (ret == NFD_OKAY) { // Success, user picked a path
         // Convert raw path to C++ string

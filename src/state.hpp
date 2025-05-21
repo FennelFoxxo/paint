@@ -73,7 +73,14 @@ struct State {
     // Color used to fill in background where no elements are drawn
     const ImVec4 clear_color{0.45f, 0.55f, 0.60f, 1.00f};
     
+    // Width and height of initial canvas
     const ImVec2 initial_canvas_size{500.0f, 500.0f};
+    
+    // Background color of icon texture when it is selected
+    const ImVec4 selected_icon_color{1, 1, 1, 1};
+    
+    // Background color of icon texture when it is not selected
+    const ImVec4 unselected_icon_color{0.3, 0.3, 0.3, 1};
     
     
     // END CONSTANTS
@@ -90,20 +97,21 @@ struct State {
     MousePos mouse_pos;     // Position of the mouse    
     MousePos mouse_pos_old; // Position of the mouse from the previous frame
     
+    // Info about mouse buttons, along with the same info from the previous frame
     MouseButtonInfo lmb_info;
-    MouseButtonInfo lmb_info_old;
     MouseButtonInfo rmb_info;
+    MouseButtonInfo lmb_info_old;
     MouseButtonInfo rmb_info_old;
     
-    // Start position of the line when in line mode
+    // Info about the current line being drawn when in line tool mode
     MousePos draw_line_start;
     MousePos draw_line_end;
     bool drawing_line = false;
     
     // Brush settings
-    int brush_size = 15; // Brush radius in pixels
+    int brush_size = 15; // Brush width (diameter) in pixels
     bool brush_details_changed = false; // Has the user tweaked the brush size or color since the last frame?
-    Texture brush_texture_preview; // Preview of brush size, circular border with no fill
+    Texture brush_texture_preview; // Preview of brush size, circular outline with no fill
     Texture brush_texture; // Brush texture, circle with fill
     DrawingTool drawing_tool = DrawingTool::Brush; // Which tool has the user selected for drawing?
     
@@ -113,12 +121,13 @@ struct State {
     ImVec4 viewport; // Bounding box of viewport
     // Negative offset of canvas from center of viewport i.e. imagining the viewport is a camera pointed at the canvas, this is the coordinates of the camera
     ImVec2 viewport_offset{0, 0};
-    float scale = 1; // How much the canvas should be scaled up or down
+    // How much the canvas should be scaled up or down
+    float scale = 1;
     
-    // Size of the menu on the right that holds drawing tools
+    // Width of the menu on the right that holds drawing tools
     int right_menu_width = 200;
     
-    // Selected paint color - values are floats between 0 and 1
+    // User selected paint color - values are floats between 0 and 1
     ImVec4 draw_color{1, 0, 0, 1};
     
     // GUI window visibility flags
@@ -132,11 +141,7 @@ struct State {
     // Texture object of the area that can be drawn to
     Texture canvas;
     
-    // Background color of icon texture when it is selected
-    ImVec4 selected_icon_color{1, 1, 1, 1};
-    
-    // Background color of icon texture when it is not selected
-    ImVec4 unselected_icon_color{0.3, 0.3, 0.3, 1};
+    // Icon textures for drawing tool modes
     struct {
         Texture brush;
         Texture line;

@@ -5,8 +5,10 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
-#include <iostream>
+
+
 // Updates the state with meta information about the graphical state and window, such as window events and mouse position
+// Should be called after ImGui frame is created, since some values aren't valid if not inside a frame
 void guiUpdateStateMeta(State* state) {
     // Iterate over any events that occured since last frame e.g. keyboard/mouse input
     SDL_Event event;
@@ -33,11 +35,13 @@ void guiUpdateStateMeta(State* state) {
     // Left mouse button
     state->lmb_info.down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
     if (state->lmb_info.down && !state->lmb_info_old.down)
+        // If the user just started holding the LMB, track the start position of the drag
         state->lmb_info.drag_start = state->mouse_pos;
     
     // Right mouse button
     state->rmb_info.down = ImGui::IsMouseDown(ImGuiMouseButton_Right);
     if (state->rmb_info.down && !state->rmb_info_old.down)
+        // If the user just started holding the RMB, track the start position of the drag
         state->rmb_info.drag_start = state->mouse_pos;
     
     // True if the mouse is over a GUI element or if the mouse started dragging over a GUI element
@@ -55,33 +59,27 @@ void drawMainMenuBar(State* state) {
         // File menu
         if (ImGui::BeginMenu("File")) {
             // "New" button
-            if (ImGui::MenuItem("New")) {
-                state->show_new_file_window = true; // Open window with new file options
-            }
+            if (ImGui::MenuItem("New")) state->show_new_file_window = true; // Open window with new file options
             
             // "Open" button
-            if (ImGui::MenuItem("Open")) {
-                state->file_action_info.status = FileActionInfo::DoOpen;
-            }
+            if (ImGui::MenuItem("Open")) state->file_action_info.status = FileActionInfo::DoOpen;
             
             // "Save As" button
-            if (ImGui::MenuItem("Save As")) {
-                state->file_action_info.status = FileActionInfo::DoSaveAs;
-            }
+            if (ImGui::MenuItem("Save As")) state->file_action_info.status = FileActionInfo::DoSaveAs;
             
             // "Exit" button
-            if (ImGui::MenuItem("Exit")) {
-                state->should_quit = true; // Quit the program
-            }
+            if (ImGui::MenuItem("Exit")) state->should_quit = true; // Quit the program
+            
+            // End of File menu
             ImGui::EndMenu();
         }
         
         // Image menu
         if (ImGui::BeginMenu("Image")) {
             // "Resize" button
-            if (ImGui::MenuItem("Resize")) {
-                state->show_resize_window = true; // Open window with resize options
-            }
+            if (ImGui::MenuItem("Resize")) state->show_resize_window = true; // Open window with resize options if clicked
+            
+            // End of Image menu
             ImGui::EndMenu();
         }
         
@@ -127,6 +125,7 @@ void drawResizeWindow(State* state) {
     if (width_i < 1) width_i = 1;
     if (height_i < 1) height_i = 1;
     
+    // Save text box values back to image_action_info.resize_info.size
     width_f = width_i, height_f = height_i;
     
     // "OK" button
@@ -140,10 +139,7 @@ void drawResizeWindow(State* state) {
     
     // Create "Cancel" button on same line as "OK" button
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
-        // Hide window without performing resize action
-        state->show_resize_window = false;
-    }
+    if (ImGui::Button("Cancel")) state->show_resize_window = false; // Hide window without performing resize action
     
     // End of resize window
     ImGui::End();
@@ -178,6 +174,7 @@ void drawNewFileWindow(State* state) {
     if (width_i < 1) width_i = 1;
     if (height_i < 1) height_i = 1;
     
+    // Save text box values back to file_action_info.new_info.size
     width_f = width_i, height_f = height_i;
     
     // "OK" button
@@ -189,15 +186,13 @@ void drawNewFileWindow(State* state) {
     
     // Create "Cancel" button on same line as "OK" button
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
-        state->show_new_file_window = false;
-    }
+    if (ImGui::Button("Cancel")) state->show_new_file_window = false; // Hide window without performing new file action
     
     // End of resize window
     ImGui::End();
 }
 
-
+// Draw menu on the right side of the screen where brush settings are
 void drawRightMenu(State* state) {
     // Set window position so that the right edge is aligned with the window,
     // and the top edge is aligned with the bottom of the menu bar
@@ -248,24 +243,36 @@ void drawRightMenu(State* state) {
     // End of buttons, restore original style
     ImGui::PopStyleVar();
     
+    // Brush size slider
+    // For style, I want the "Brush size" label to be above the slider and not to the size
     ImGui::Text("Brush size");
+    // Adding ## to the start hides the label
+    // Cap brush size between 1 and 100
     if(ImGui::SliderInt("##Brush size", &state->brush_size, 1, 100)) {
+        // Let backend know to recreate the brush texture
         state->brush_details_changed = true;
     }
 
-    // Edit 3 floats representing a color
     ImGui::Text("Brush color");
+    // Edit 3 floats representing a color
+    // Hide color preview (you can already see the selected color based on the brush preview) and label text (we place the label above the color picker)
     if (ImGui::ColorPicker3("Draw color", (float*)&state->draw_color, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoLabel)) {
+        // Let backend know to recreate the brush texture
         state->brush_details_changed = true;
     }
     
     // Skip to the bottom of the window
+    // viewport.y is the height of the top menu bar, or the y position that this right menu starts at
     // GetFrameHeightWithSpacing() is the height of one element
     ImGui::SetCursorPosY(state->window_height - state->viewport.y - ImGui::GetFrameHeightWithSpacing());
+    
+    // Print FPS
     ImGui::Text("%.1f FPS", state->framerate);
 
+    // Set viewport width to be the left edge of this menu
     state->viewport.z = ImGui::GetWindowPos().x;
     
+    // End of right menu
     ImGui::End();
 }
 
@@ -318,16 +325,19 @@ void guiPresent(State* state) {
         SDL_RenderTexture(renderer, state->canvas.get(), NULL, &canvas_dest_rect);
     }
     
-    // Brush tool preview rendering
+    // Brush tool preview rendering, only makes sense for brush and line tool modes
     if (state->drawing_tool == DrawingTool::Brush || state->drawing_tool == DrawingTool::Line) {
         ImVec2 brush_preview_size = state->brush_texture_preview.size();
         
+        // Make sure brush preview texture is centered around the cursor
         SDL_FRect brush_dest_rect{
             state->mouse_pos.screen.x - brush_preview_size.x / 2 * state->scale,
             state->mouse_pos.screen.y - brush_preview_size.y / 2 * state->scale,
             brush_preview_size.x * state->scale,
             brush_preview_size.y * state->scale
         };
+        
+        // Render brush texture preview to the screen
         SDL_RenderTexture(renderer, state->brush_texture_preview.get(), NULL, &brush_dest_rect);
     }
     
@@ -342,8 +352,10 @@ void guiPresent(State* state) {
         ImVec2 start_canvas = state->draw_line_start.canvas;
         ImVec2 start_screen = canvasToScreenPos(state->canvas.size(), state->viewport, state->viewport_offset, state->scale, start_canvas);
         
-        
+        // End position of line
         ImVec2 end = state->draw_line_end.screen;
+        
+        // Render line to screen
         SDL_RenderLine(renderer, start_screen.x, start_screen.y, end.x, end.y);
     }
     

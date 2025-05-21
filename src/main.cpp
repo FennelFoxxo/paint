@@ -2,8 +2,6 @@
 #include "gui.hpp"
 #include "backend.hpp"
 #include "texture.hpp"
-#include <iostream>
-
 
 int main(int, char**)
 {
@@ -30,5 +28,6 @@ int main(int, char**)
         backendProcess(&state);
     }
 
+    // Return no error if application quit normally
     return 0;
 }

@@ -19,14 +19,15 @@
 // Convert a position from canvas space to screen space
 ImVec2 canvasToScreenPos(ImVec2 canvas_size, ImVec4 viewport, ImVec2 viewport_offset, float scale, ImVec2 point) {
     // Scale everything up
-    point.x *= scale;
-    point.y *= scale;
-    
     canvas_size.x *= scale;
     canvas_size.y *= scale;
     viewport_offset.x *= scale;
     viewport_offset.y *= scale;
     
+    point.x *= scale;
+    point.y *= scale;
+    
+    // First the center of the canvas needs to be placed in the center of the viewport, then offset
     point.x += viewport.x + viewport.z / 2.0f - canvas_size.x / 2.0f - viewport_offset.x;
     point.y += viewport.y + viewport.w / 2.0f - canvas_size.y / 2.0f - viewport_offset.y;
     
@@ -35,6 +36,7 @@ ImVec2 canvasToScreenPos(ImVec2 canvas_size, ImVec4 viewport, ImVec2 viewport_of
 
 // Convert a position from screen space to canvas space
 ImVec2 screenToCanvasPos(ImVec2 canvas_size, ImVec4 viewport, ImVec2 viewport_offset, float scale, ImVec2 point) {
+    // Same operation as canvasToScreenPos but in reverse
     canvas_size.x *= scale;
     canvas_size.y *= scale;
     viewport_offset.x *= scale;
@@ -94,6 +96,9 @@ void drawCircle(SDL_Surface* surface, int radius, ImVec4 color) {
     int ty = 1;
     int error = tx - diameter;
 
+    // This algorithm works by just filling in the first eighth of a circle
+    // However, each x and y can be flipped and rotated around the center so that
+    // every eighth is drawn in parallel
     while (x >= y) {
         editPixel(pixels, pitch, center_x + x, center_y + y, rgba);
         editPixel(pixels, pitch, center_x + x, center_y - y, rgba);
@@ -218,9 +223,12 @@ SDL_Surface* openImage(std::string path) {
     // Load image data and request 4 channels
     int w, h;
     unsigned char *data = stbi_load(path.c_str(), &w, &h, nullptr, 4);
+    
+    // Throw error if image could not be loaded
     if (data == nullptr)
         throw std::runtime_error("stbi_load()");
     
+    // New surface to hold image data
     SDL_Surface* image = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA8888);
     if (image == nullptr) {
         stbi_image_free(data);
@@ -246,6 +254,7 @@ SDL_Surface* openImage(std::string path) {
     // Free image data
     stbi_image_free(data);
     
+    // Log success
     std::cout << "Opened file " << path << std::endl;
     
     return image;
@@ -299,7 +308,10 @@ void saveImage(std::string path, SDL_Surface* surface) {
         ret = stbi_write_png(path.c_str(), surface->w, surface->h, 4, data.get(), surface->w * sizeof(Uint32));
     }
     
+    // Check that file was saved successfully
     if (ret == 0)
         throw std::runtime_error("Error: stbi_write()");
+    
+    // Log success
     std::cout << "Saved file as " << path << std::endl;
 }
